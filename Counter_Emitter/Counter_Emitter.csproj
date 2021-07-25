@@ -54,6 +54,7 @@
   <ItemGroup>
     <Compile Include="Model\IRecord.cs" />
     <Compile Include="Model\LoginRecord.cs" />
+    <Compile Include="Model\UserRecord.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

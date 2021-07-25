@@ -11,6 +11,8 @@ using System.Threading;
 using System.IO;
 using NDbfReader;
 using Counter_Emitter.Model;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Counter_Emitter
 {
@@ -23,7 +25,9 @@ namespace Counter_Emitter
         private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static readonly ManualResetEvent workToDo = new ManualResetEvent(false);
 
+        private static List<string> fileToWatch = new List<string> { "PLOGIN.DBF", "USER.DBF" };
         private static FileSystemWatcher watcher;
+        private static DictionaryKey? settingKey;
 
         async static Task Main(string[] args) {
             InitializeConfiguration();
@@ -40,11 +44,10 @@ namespace Counter_Emitter
                 watcher = new FileSystemWatcher(settingsConfig[DictionaryKey.DBASEDIR])
                 {
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Security | NotifyFilters.Size,
-                    Filter = "PLOGIN.DBF"
+                    Filter = "*.DBF"
                 };
 
-                //watcher.Changed += OnChanged;
-                watcher.Changed += (source, e) => { workToDo.Set(); };
+                watcher.Changed += OnChanged;
 
                 watcher.EnableRaisingEvents = true;
                 Console.WriteLine("Listening to file change.. Press CTRL + C to exit..");
@@ -67,8 +70,6 @@ namespace Counter_Emitter
                     try
                     {
                         if (!cts.IsCancellationRequested) await MainAsync(cts.Token);
-                        //if (!cts.IsCancellationRequested) await NewImplementation<LoginRecord>("./hello",cts.Token);
-
                     }
                     catch (Exception ex)
                     {
@@ -94,6 +95,31 @@ namespace Counter_Emitter
                 watcher?.Dispose();
                 workToDo.Close();
                 cts.Dispose();
+            }
+        }
+
+        private static void OnChanged(object source, FileSystemEventArgs e)
+        {
+            // get the file's extension
+            string fileName = e.Name;
+
+            // filter file types
+            if (fileToWatch.Contains(fileName))
+            {
+                switch (fileName)
+                {
+                    case "PLOGIN.DBF":
+                        settingKey = DictionaryKey.PLOGIN;
+                        break;
+                    case "USER.DBF":
+                        settingKey = DictionaryKey.USER;
+                        break;
+                    default:
+                        settingKey = null;
+                        break;
+                }
+                Console.WriteLine($"A change has been made to a watched file type. {fileName}");
+                workToDo.Set();
             }
         }
 
@@ -126,72 +152,63 @@ namespace Counter_Emitter
         {
 
             // Get the path of PLOGIN dBaseFile
-            string fileRoute = settingsConfig[DictionaryKey.PLOGIN];
-            IList<LoginRecord> loginRecords;
+            string fileRoute = settingsConfig[DictionaryKey.USER];
+            string url = settingsConfig[DictionaryKey.APIURL];
+            IList<IRecord> records;
+
             try
             {
                 Console.WriteLine($"Reading DBF from ..{fileRoute}");
-                loginRecords = await GetRecordsFromDbfAsync<LoginRecord>(fileRoute, cts);
 
-                //if (!await IsThereRecordChange(dbf))
-                //{
-                //    Console.WriteLine("No changes to Database. Ending early..");
-                //    Thread.Sleep(1000);
-                //    return;
-                //}
+                switch (settingKey)
+                {
+                    case DictionaryKey.PLOGIN:
+                        url = $"{url}/loginsession";
+                        records = await GetRecordsFromDbfAsync<LoginRecord>(fileRoute, cts);
+                        records = records.Where(record => record.DATE == todayDate).ToList();
+                        break;
+                    case DictionaryKey.USER:
+                        url = $"{url}/counteruser";
+                        records = await GetRecordsFromDbfAsync<UserRecord>(fileRoute, cts);
+                        break;
+                    default:
+                        settingKey = null;
+                        // Means that it is not supported
+                        return;
+                }
 
+
+                if (records.Count > 0)
+                {
+                    Dictionary<string, object> jsonObj = new Dictionary<string, object>
+                    {
+                        { "data", JsonConvert.SerializeObject(records) }
+                    };
+
+                    var serializedJsonObj = JsonConvert.SerializeObject(jsonObj);
+
+                    var content = new StringContent(serializedJsonObj, Encoding.UTF8, "application/json");
+
+                    // Send the datajsonObj to api
+                     await SendPostRequestAsync(url, content, cts);
+
+                    // Reset the setting key
+                    settingKey = null;
+                }
+                else
+                {
+                    Console.WriteLine("No records for today.");
+                }
             }
             catch (InvalidDataException)
             {
                 throw;
             }
-            catch (Exception) 
+            catch (FileNotFoundException) 
             {
                 throw new FileNotFoundException($"{fileRoute} not found, ensure DBF location properly configured.");
             }
 
-            if(loginRecords.Count > 0)
-            {
-                Dictionary<string, object> jsonObj = new Dictionary<string, object>
-                    {
-                        { "data", JsonConvert.SerializeObject(loginRecords) }
-                    };
-
-                var serializedJsonObj = JsonConvert.SerializeObject(jsonObj);
-
-                var content = new StringContent(serializedJsonObj, Encoding.UTF8, "application/json");
-
-                //Send the datajsonObj to api
-                using (HttpClient client = new HttpClient())
-                {
-                    try
-                    {
-                        Uri url = new UriBuilder(settingsConfig[DictionaryKey.APIURL]).Uri;
-                        client.DefaultRequestHeaders.Accept.Clear();
-                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                        Console.WriteLine($"Sending Request to ..{url}..");
-                        HttpResponseMessage response = await client.PostAsync(url, content, cts);
-
-                        var httpStatus = response.StatusCode;
-
-                        response.EnsureSuccessStatusCode();
-                        Console.WriteLine($"Response was {httpStatus}");
-                        //Console.WriteLine("Request Complete. Exiting..!");
-                        Console.WriteLine("Request Complete.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("\nException Caught!");
-                        Console.WriteLine($"Message : {ex.Message}");
-                        //Console.WriteLine("Press any key to continue...");
-                    }
-                }
-            } 
-            else
-            {
-                Console.WriteLine("No records for today.");
-            }
 
         }
         private static void InitializeConfiguration()
@@ -199,11 +216,13 @@ namespace Counter_Emitter
             const string PLOGIN = "PLOGINPATH";
             const string APIURL = "APIURL";
             const string DBASEDIR = "DBASEDIR";
+            const string USER = "USER";
 
             Console.WriteLine("Initializing configs..");
             settingsConfig.Add(DictionaryKey.PLOGIN, ConfigurationManager.AppSettings.Get(PLOGIN) ?? throw new KeyNotFoundException($"Key {PLOGIN} not found"));
             settingsConfig.Add(DictionaryKey.APIURL, ConfigurationManager.AppSettings.Get(APIURL) ?? throw new KeyNotFoundException($"Key {APIURL} not found"));
             settingsConfig.Add(DictionaryKey.DBASEDIR, ConfigurationManager.AppSettings.Get(DBASEDIR) ?? throw new KeyNotFoundException($"Key {DBASEDIR} not found"));
+            settingsConfig.Add(DictionaryKey.USER, ConfigurationManager.AppSettings.Get(USER) ?? throw new KeyNotFoundException($"Key {USER} not found"));
         }
 
         //No longer used
@@ -250,9 +269,9 @@ namespace Counter_Emitter
         /// <param name="fileRoute">Path to The DBF file</param>
         /// <param name="cts"></param>
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
-        private async static Task<IList<T>> GetRecordsFromDbfAsync<T>(string fileRoute , CancellationToken cts) where T : IRecord, new()
+        private async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute , CancellationToken cts) where T : IRecord, new()
         {
-            var records = new List<T>();
+            var records = new List<IRecord>();
             using (Table table = await Table.OpenAsync(fileRoute, cts))
             {
                 try
@@ -266,11 +285,7 @@ namespace Counter_Emitter
                         {
                             properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
                         }
-
-                        if (TRecord.DATE == todayDate)
-                        {
-                            records.Add(TRecord);
-                        }
+                        records.Add(TRecord);
                     }
                 }
                 catch (Exception)
@@ -280,11 +295,41 @@ namespace Counter_Emitter
             }
             return records;
         }
+
+        private async static Task SendPostRequestAsync(string urlParam, HttpContent content, CancellationToken cts)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    Uri url = new UriBuilder(urlParam).Uri;
+                    client.DefaultRequestHeaders.Accept.Clear();
+                    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                    Console.WriteLine($"Sending Request to ..{url}..");
+                    HttpResponseMessage response = await client.PostAsync(url, content, cts);
+
+                    var httpStatus = response.StatusCode;
+
+                    response.EnsureSuccessStatusCode();
+                    Console.WriteLine($"Response was {httpStatus}");
+                    //Console.WriteLine("Request Complete. Exiting..!");
+                    Console.WriteLine("Request Complete.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("\nException Caught!");
+                    Console.WriteLine($"Message : {ex.Message}");
+                    //Console.WriteLine("Press any key to continue...");
+                }
+            }
+        }
     }
 
     enum DictionaryKey
     {
         PLOGIN,
+        USER,
         APIURL,
         DBASEDIR
     }
