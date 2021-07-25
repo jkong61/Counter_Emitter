@@ -12,7 +12,6 @@ using NDbfReader;
 using Counter_Emitter.Model;
 using System.Linq;
 using System.Text.Json;
-using System.ComponentModel;
 
 namespace Counter_Emitter
 {
@@ -193,11 +192,12 @@ namespace Counter_Emitter
                     var stringJsonObj = JsonSerializer.Serialize(jsonObj);
 
 
-                    var content = new ByteArrayContent(serializedJsonObj);
+                    var content = new StringContent(serializedJsonObj, Encoding.UTF8, "application/json");
 
                     // Send the datajsonObj to api
                      await SendPostRequestAsync(url, content, cts);
 
+                    }
                     // Reset the setting key
                     settingKey = null;
                 }
