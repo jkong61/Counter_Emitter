@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Net.Http;
@@ -12,7 +11,8 @@ using System.IO;
 using NDbfReader;
 using Counter_Emitter.Model;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Text.Json;
+using System.ComponentModel;
 
 namespace Counter_Emitter
 {
@@ -51,9 +51,6 @@ namespace Counter_Emitter
 
                 watcher.EnableRaisingEvents = true;
                 Console.WriteLine("Listening to file change.. Press CTRL + C to exit..");
-
-                //Console.WriteLine("Listening to file change.. Press any key to exit..");
-                //Console.ReadLine();
 
                 while (!cts.IsCancellationRequested)
                 {
@@ -180,14 +177,23 @@ namespace Counter_Emitter
 
                 if (records.Count > 0)
                 {
-                    Dictionary<string, object> jsonObj = new Dictionary<string, object>
+
+                    var jsonOptions = new JsonSerializerOptions
                     {
-                        { "data", JsonConvert.SerializeObject(records) }
+                        Converters = { new IRecordConverter() },
+                        IncludeFields = true
                     };
 
-                    var serializedJsonObj = JsonConvert.SerializeObject(jsonObj);
+                    Dictionary<string, string> jsonObj = new Dictionary<string, string>
+                    {
+                        { "data", JsonSerializer.Serialize(records, jsonOptions) }
+                    };
 
-                    var content = new StringContent(serializedJsonObj, Encoding.UTF8, "application/json");
+                    var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
+                    var stringJsonObj = JsonSerializer.Serialize(jsonObj);
+
+
+                    var content = new ByteArrayContent(serializedJsonObj);
 
                     // Send the datajsonObj to api
                      await SendPostRequestAsync(url, content, cts);
