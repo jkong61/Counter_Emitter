@@ -152,23 +152,23 @@ namespace Counter_Emitter
         {
 
             // Get the path of PLOGIN dBaseFile
-            string fileRoute = settingsConfig[DictionaryKey.USER];
+            string fileRoute;
             string url = settingsConfig[DictionaryKey.APIURL];
             IList<IRecord> records;
 
             try
             {
-                Console.WriteLine($"Reading DBF from ..{fileRoute}");
-
                 switch (settingKey)
                 {
                     case DictionaryKey.PLOGIN:
                         url = $"{url}/loginsession";
+                        fileRoute = settingsConfig[DictionaryKey.PLOGIN];
                         records = await GetRecordsFromDbfAsync<LoginRecord>(fileRoute, cts);
                         records = records.Where(record => record.DATE == todayDate).ToList();
                         break;
                     case DictionaryKey.USER:
                         url = $"{url}/counteruser";
+                        fileRoute = settingsConfig[DictionaryKey.USER];
                         records = await GetRecordsFromDbfAsync<UserRecord>(fileRoute, cts);
                         break;
                     default:
@@ -203,10 +203,6 @@ namespace Counter_Emitter
             catch (InvalidDataException)
             {
                 throw;
-            }
-            catch (FileNotFoundException) 
-            {
-                throw new FileNotFoundException($"{fileRoute} not found, ensure DBF location properly configured.");
             }
 
 
@@ -271,27 +267,35 @@ namespace Counter_Emitter
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
         private async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute , CancellationToken cts) where T : IRecord, new()
         {
+            Console.WriteLine($"Reading DBF from ..{fileRoute}");
             var records = new List<IRecord>();
-            using (Table table = await Table.OpenAsync(fileRoute, cts))
+            try
             {
-                try
+                using (Table table = await Table.OpenAsync(fileRoute, cts))
                 {
-                    var reader = table.OpenReader(Encoding.UTF8);
-                    while (await reader.ReadAsync(cts))
+                    try
                     {
-                        T TRecord = new T();
-                        PropertyInfo[] properties = typeof(T).GetProperties();
-                        for (int i = 0; i < table.Columns.Count; i++)
+                        var reader = table.OpenReader(Encoding.UTF8);
+                        while (await reader.ReadAsync(cts))
                         {
-                            properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
+                            T TRecord = new T();
+                            PropertyInfo[] properties = typeof(T).GetProperties();
+                            for (int i = 0; i < table.Columns.Count; i++)
+                            {
+                                properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
+                            }
+                            records.Add(TRecord);
                         }
-                        records.Add(TRecord);
+                    }
+                    catch (Exception)
+                    {
+                        throw new InvalidDataException("DBF Table is likely in the wrong format.");
                     }
                 }
-                catch (Exception)
-                {
-                    throw new InvalidDataException("DBF Table is likely in the wrong format.");
-                }
+            }
+            catch (FileNotFoundException)
+            {
+                throw new FileNotFoundException($"{fileRoute} not found, ensure DBF location properly configured.");
             }
             return records;
         }
