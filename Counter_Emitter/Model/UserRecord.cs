@@ -9,27 +9,28 @@ namespace Counter_Emitter.Model
 {
     class UserRecord : IRecord
     {
-        [JsonInclude]
         public string USERID { get; set; }
+        [JsonIgnore]
         public string PASSWORD { get; set; }
+        [JsonIgnore]
         public string MENU { get; set; }
-        [JsonInclude]
         public string NAME { get; set; }
-        [JsonInclude]
         public string SNAME { get; set; }
-        [JsonInclude]
         public string POSITION { get; set; }
-        [JsonInclude]
         public DateTime DATE { get; set; }
+        [JsonIgnore]
         public string RIGHT { get; set; }
+        [JsonIgnore]
         public string RIGHT1 { get; set; }
-        [JsonInclude]
         public DateTime LASTUPDATE { get; set; }
+        [JsonIgnore]
         public string LANGUAGE { get; set; }
+        [JsonIgnore]
         public decimal POLIMIT { get; set; }
+        [JsonIgnore]
         public string CARDNO { get; set; }
-        [JsonInclude]
         public bool ACTIVE {  get; set; }
+        [JsonIgnore]
         public string T1 { get; set; }
 
         public UserRecord() {}

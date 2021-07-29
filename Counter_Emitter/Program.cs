@@ -28,7 +28,8 @@ namespace Counter_Emitter
         private static FileSystemWatcher watcher;
         private static DictionaryKey? settingKey;
 
-        async static Task Main(string[] args) {
+        async static Task Main(string[] args)
+        {
             InitializeConfiguration();
             Console.CancelKeyPress += (s, evnt) =>
             {
@@ -79,7 +80,7 @@ namespace Counter_Emitter
                     }
                 }
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 Console.WriteLine("\nException Caught!");
                 Console.WriteLine($"Message : {ex.Message}");
@@ -173,7 +174,6 @@ namespace Counter_Emitter
                         return;
                 }
 
-
                 if (records.Count > 0)
                 {
 
@@ -188,15 +188,14 @@ namespace Counter_Emitter
                         { "data", JsonSerializer.Serialize(records, jsonOptions) }
                     };
 
-                    var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
+                    //var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
                     var stringJsonObj = JsonSerializer.Serialize(jsonObj);
 
 
-                    var content = new StringContent(serializedJsonObj, Encoding.UTF8, "application/json");
-
-                    // Send the datajsonObj to api
-                     await SendPostRequestAsync(url, content, cts);
-
+                    using (var content = new StringContent(stringJsonObj, Encoding.UTF8, "application/json"))
+                    {
+                        // Send the datajsonObj to api
+                        await SendPostRequestAsync(url, content, cts);
                     }
                     // Reset the setting key
                     settingKey = null;
@@ -211,8 +210,9 @@ namespace Counter_Emitter
                 throw;
             }
 
-
+            records.Clear();
         }
+
         private static void InitializeConfiguration()
         {
             const string PLOGIN = "PLOGINPATH";
@@ -271,7 +271,7 @@ namespace Counter_Emitter
         /// <param name="fileRoute">Path to The DBF file</param>
         /// <param name="cts"></param>
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
-        private async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute , CancellationToken cts) where T : IRecord, new()
+        private async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts) where T : IRecord, new()
         {
             Console.WriteLine($"Reading DBF from ..{fileRoute}");
             var records = new List<IRecord>();
@@ -333,6 +333,7 @@ namespace Counter_Emitter
                     //Console.WriteLine("Press any key to continue...");
                 }
             }
+
         }
     }
 
@@ -344,3 +345,4 @@ namespace Counter_Emitter
         DBASEDIR
     }
 }
+
