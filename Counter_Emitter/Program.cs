@@ -18,15 +18,14 @@ namespace Counter_Emitter
     class Program
     {
         //private static readonly DateTime todayDate = new DateTime(2019, 8, 31);
-        private static readonly DateTime todayDate = DateTime.Today;
         private static readonly Dictionary<DictionaryKey, string> settingsConfig = new Dictionary<DictionaryKey, string>();
 
         private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static readonly ManualResetEvent workToDo = new ManualResetEvent(false);
 
-        private static List<string> fileToWatch = new List<string> { "PLOGIN.DBF", "USER.DBF" };
+        private static readonly List<string> fileToWatch = new List<string> { "PLOGIN.DBF", "USER.DBF" };
         private static FileSystemWatcher watcher;
-        private static DictionaryKey? settingKey;
+        private static Strategy strategy;
 
         async static Task Main(string[] args)
         {
@@ -66,7 +65,7 @@ namespace Counter_Emitter
 
                     try
                     {
-                        if (!cts.IsCancellationRequested) await MainAsync(cts.Token);
+                        if (!cts.IsCancellationRequested) await MainAsync();
                     }
                     catch (Exception ex)
                     {
@@ -99,6 +98,7 @@ namespace Counter_Emitter
         {
             // get the file's extension
             string fileName = e.Name;
+            string baseUrl = settingsConfig[DictionaryKey.APIURL];
 
             // filter file types
             if (fileToWatch.Contains(fileName))
@@ -106,75 +106,28 @@ namespace Counter_Emitter
                 switch (fileName)
                 {
                     case "PLOGIN.DBF":
-                        settingKey = DictionaryKey.PLOGIN;
+                        strategy = new LoginStrategy(baseUrl, settingsConfig[DictionaryKey.PLOGIN], cts.Token);
                         break;
                     case "USER.DBF":
-                        settingKey = DictionaryKey.USER;
+                        strategy = new UserStrategy(baseUrl, settingsConfig[DictionaryKey.USER], cts.Token);
                         break;
                     default:
-                        settingKey = null;
-                        break;
+                        strategy = null;
+                        return;
                 }
                 Console.WriteLine($"A change has been made to a watched file type. {fileName}");
                 workToDo.Set();
             }
         }
 
-        //No longer used
-        //private static async void OnChanged(object sender, FileSystemEventArgs fileEvent)
-        //{
-        //    if (fileEvent.ChangeType != WatcherChangeTypes.Changed)
-        //    {
-        //        return;
-        //    }
-        //    Console.WriteLine($"Changed: {fileEvent.FullPath}");
-
-        //    try
-        //    {
-        //        await MainAsync(cts.Token);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine("\nException Caught!");
-        //        Console.WriteLine($"Message : {ex.Message}");
-        //        //Console.WriteLine("Press any key to continue...");
-        //    }
-        //    finally
-        //    {
-        //        Console.WriteLine("Listening to file change.. Press any key to exit.");
-        //    }
-        //}
-
-        private static async Task MainAsync(CancellationToken cts)
+        private static async Task MainAsync()
         {
-
-            // Get the path of PLOGIN dBaseFile
-            string fileRoute;
-            string url = settingsConfig[DictionaryKey.APIURL];
-            IList<IRecord> records;
 
             try
             {
-                switch (settingKey)
-                {
-                    case DictionaryKey.PLOGIN:
-                        url = $"{url}/loginsession";
-                        fileRoute = settingsConfig[DictionaryKey.PLOGIN];
-                        records = await GetRecordsFromDbfAsync<LoginRecord>(fileRoute, cts);
-                        records = records.Where(record => record.DATE == todayDate).ToList();
-                        break;
-                    case DictionaryKey.USER:
-                        url = $"{url}/counteruser";
-                        fileRoute = settingsConfig[DictionaryKey.USER];
-                        records = await GetRecordsFromDbfAsync<UserRecord>(fileRoute, cts);
-                        break;
-                    default:
-                        settingKey = null;
-                        // Means that it is not supported
-                        return;
-                }
+                await strategy.Execute();
 
-                if (records.Count > 0)
+                if (strategy.Records.Count > 0)
                 {
 
                     var jsonOptions = new JsonSerializerOptions
@@ -185,21 +138,21 @@ namespace Counter_Emitter
 
                     Dictionary<string, string> jsonObj = new Dictionary<string, string>
                     {
-                        { "data", JsonSerializer.Serialize(records, jsonOptions) },
+                        { "data", JsonSerializer.Serialize(strategy.Records, jsonOptions) },
                         { "branch", settingsConfig[DictionaryKey.BRANCHID] }
                     };
 
                     //var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
                     var stringJsonObj = JsonSerializer.Serialize(jsonObj);
 
-
                     using (var content = new StringContent(stringJsonObj, Encoding.UTF8, "application/json"))
                     {
                         // Send the datajsonObj to api
-                        await SendPostRequestAsync(url, content, cts);
+                        await SendPostRequestAsync(strategy.Url, content, strategy.cts);
                     }
                     // Reset the setting key
-                    settingKey = null;
+                    strategy.Clear();
+                    strategy = null;
                 }
                 else
                 {
@@ -210,8 +163,6 @@ namespace Counter_Emitter
             {
                 throw;
             }
-
-            records.Clear();
         }
 
         private static void InitializeConfiguration()
@@ -230,42 +181,6 @@ namespace Counter_Emitter
             settingsConfig.Add(DictionaryKey.BRANCHID, ConfigurationManager.AppSettings.Get(BRANCHID) ?? throw new KeyNotFoundException($"Key {BRANCHID} not found"));
         }
 
-        //No longer used
-        //private async static Task<bool> IsThereRecordChange(Dbf dbfInstance)
-        //{
-        //    string path = "./reference.txt";
-        //    int recordCount = dbfInstance.Records.Count;
-
-        //    // Only create text file if it doesn't exist
-        //    if (!File.Exists(path))
-        //    {
-        //        // Create a file to write to.
-        //        using (StreamWriter sw = File.CreateText(path))
-        //        {
-        //            await sw.WriteAsync(recordCount.ToString());
-        //        }
-        //    }
-
-        //    // Open the file to read from.
-        //    using (StreamReader sr = File.OpenText(path))
-        //    {
-        //        string count = await sr.ReadLineAsync();
-        //        int numRecords = Convert.ToInt32(count);
-        //        if (recordCount == 0 || numRecords == recordCount)
-        //        {
-        //            // Don't need to do anything here,and return early
-        //            return false;
-        //        }
-        //    }
-
-        //    // Continue to overwrite the files if the record counts are not the
-        //    using (StreamWriter sw = File.CreateText(path))
-        //    {
-        //        await sw.WriteAsync(recordCount.ToString());
-        //    }
-        //    return true;
-        //}
-
         /// <summary>
         /// Transforms a DBaseFile into provided type <typeparamref name="T"/>.<br/>
         /// In order for this to work accurately, the provided type property field arrangements must match the column arrangements from the DBaseFile.
@@ -274,7 +189,7 @@ namespace Counter_Emitter
         /// <param name="fileRoute">Path to The DBF file</param>
         /// <param name="cts"></param>
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
-        private async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts) where T : IRecord, new()
+        public async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts) where T : IRecord, new()
         {
             Console.WriteLine($"Reading DBF from ..{fileRoute}");
             var records = new List<IRecord>();

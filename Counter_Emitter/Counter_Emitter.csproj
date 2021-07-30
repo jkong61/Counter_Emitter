@@ -74,12 +74,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LoginStrategy.cs" />
     <Compile Include="Model\IRecord.cs" />
     <Compile Include="Model\IRecordConverter.cs" />
     <Compile Include="Model\LoginRecord.cs" />
     <Compile Include="Model\UserRecord.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Strategy.cs" />
+    <Compile Include="UserStrategy.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
