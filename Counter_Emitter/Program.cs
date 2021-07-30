@@ -185,7 +185,8 @@ namespace Counter_Emitter
 
                     Dictionary<string, string> jsonObj = new Dictionary<string, string>
                     {
-                        { "data", JsonSerializer.Serialize(records, jsonOptions) }
+                        { "data", JsonSerializer.Serialize(records, jsonOptions) },
+                        { "branch", settingsConfig[DictionaryKey.BRANCHID] }
                     };
 
                     //var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
@@ -219,12 +220,14 @@ namespace Counter_Emitter
             const string APIURL = "APIURL";
             const string DBASEDIR = "DBASEDIR";
             const string USER = "USER";
+            const string BRANCHID = "BRANCHID";
 
             Console.WriteLine("Initializing configs..");
             settingsConfig.Add(DictionaryKey.PLOGIN, ConfigurationManager.AppSettings.Get(PLOGIN) ?? throw new KeyNotFoundException($"Key {PLOGIN} not found"));
             settingsConfig.Add(DictionaryKey.APIURL, ConfigurationManager.AppSettings.Get(APIURL) ?? throw new KeyNotFoundException($"Key {APIURL} not found"));
             settingsConfig.Add(DictionaryKey.DBASEDIR, ConfigurationManager.AppSettings.Get(DBASEDIR) ?? throw new KeyNotFoundException($"Key {DBASEDIR} not found"));
             settingsConfig.Add(DictionaryKey.USER, ConfigurationManager.AppSettings.Get(USER) ?? throw new KeyNotFoundException($"Key {USER} not found"));
+            settingsConfig.Add(DictionaryKey.BRANCHID, ConfigurationManager.AppSettings.Get(BRANCHID) ?? throw new KeyNotFoundException($"Key {BRANCHID} not found"));
         }
 
         //No longer used
@@ -342,7 +345,8 @@ namespace Counter_Emitter
         PLOGIN,
         USER,
         APIURL,
-        DBASEDIR
+        DBASEDIR,
+        BRANCHID
     }
 }
 
