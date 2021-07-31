@@ -189,7 +189,7 @@ namespace Counter_Emitter
         /// <param name="fileRoute">Path to The DBF file</param>
         /// <param name="cts"></param>
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
-        public async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts) where T : IRecord, new()
+        public async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts, DateTime? dateTimeFilter) where T : IRecord, new()
         {
             Console.WriteLine($"Reading DBF from ..{fileRoute}");
             var records = new List<IRecord>();
@@ -208,7 +208,17 @@ namespace Counter_Emitter
                             {
                                 properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
                             }
-                            records.Add(TRecord);
+
+                            if (dateTimeFilter == null)
+                            {
+                                records.Add(TRecord);
+                                continue;
+                            }
+
+                            if (TRecord.DATE == dateTimeFilter)
+                            {
+                                records.Add(TRecord);
+                            }
                         }
                     }
                     catch (Exception)

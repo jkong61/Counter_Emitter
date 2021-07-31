@@ -17,7 +17,7 @@ namespace Counter_Emitter
 
         async public override Task Execute()
         {
-            Records = await GetRecordsFromDbfAsync<UserRecord>(FilePath, cts);
+            Records = await GetRecordsFromDbfAsync<UserRecord>(FilePath, cts, null);
         }
     }
 }
