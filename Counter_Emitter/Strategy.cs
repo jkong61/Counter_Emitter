@@ -18,6 +18,7 @@ namespace Counter_Emitter
             Url = lUrl;
             FilePath = lFilePath;
             cts = lToken;
+            Records = new List<IRecord>();
         }
 
         public abstract Task Execute();

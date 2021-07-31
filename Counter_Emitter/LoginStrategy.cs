@@ -19,7 +19,8 @@ namespace Counter_Emitter
         async public override Task Execute()
         {
             DateTime todayDate = DateTime.Today;
-            Records = (await GetRecordsFromDbfAsync<LoginRecord>(FilePath, cts)).Where(record => record.DATE == todayDate).ToList();
+            var records = await GetRecordsFromDbfAsync<LoginRecord>(FilePath, cts);
+            Records = records.Where(record => record.DATE == todayDate).ToList();
         }
     }
 }
