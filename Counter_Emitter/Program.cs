@@ -12,6 +12,7 @@ using NDbfReader;
 using Counter_Emitter.Model;
 using System.Linq;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace Counter_Emitter
 {
@@ -209,7 +210,7 @@ namespace Counter_Emitter
                                 properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
                             }
 
-                            if (dateTimeFilter == null)
+                            if (dateTimeFilter is null)
                             {
                                 records.Add(TRecord);
                                 continue;
@@ -240,9 +241,11 @@ namespace Counter_Emitter
             {
                 try
                 {
+                    string apikey = GenerateAPIKey($"fungming-{settingsConfig[DictionaryKey.BRANCHID]}-{DateTime.Now:yyyy-MM-dd}");
                     Uri url = new UriBuilder(urlParam).Uri;
                     client.DefaultRequestHeaders.Accept.Clear();
                     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    if (apikey != null) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apikey);
 
                     Console.WriteLine($"Sending Request to ..{url}..");
                     HttpResponseMessage response = await client.PostAsync(url, content, cts);
@@ -262,6 +265,24 @@ namespace Counter_Emitter
                 }
             }
 
+        }
+
+        private static string GenerateAPIKey(string rawData)
+        {
+            // Create a SHA256   
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                // ComputeHash - returns byte array  
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+
+                // Convert byte array to a string   
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString();
+            }
         }
     }
 
