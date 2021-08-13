@@ -241,7 +241,7 @@ namespace Counter_Emitter
             {
                 try
                 {
-                    string apikey = GenerateAPIKey($"fungming-{settingsConfig[DictionaryKey.BRANCHID]}-{DateTime.Now:yyyy-MM-dd}");
+                    string apikey = GenerateAPIKey($"fungming-{settingsConfig[DictionaryKey.BRANCHID].ToUpper()}-{DateTime.UtcNow:yyyyMMdd}");
                     Uri url = new UriBuilder(urlParam).Uri;
                     client.DefaultRequestHeaders.Accept.Clear();
                     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
