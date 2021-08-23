@@ -11,6 +11,8 @@ using System.IO;
 using NDbfReader;
 using Counter_Emitter.Model;
 using System.Linq;
+using System.Net;
+using System.Net.Security;
 using System.Text.Json;
 using System.Security.Cryptography;
 
@@ -25,7 +27,8 @@ namespace Counter_Emitter
         private static readonly ManualResetEvent workToDo = new ManualResetEvent(false);
 
         private static readonly List<string> fileToWatch = new List<string> { "PLOGIN.DBF", "USER.DBF" };
-        private static FileSystemWatcher watcher;
+        private static FileSystemWatcher watcher_counter;
+        private static FileSystemWatcher watcher_login;
         private static Strategy strategy;
 
         async static Task Main(string[] args)
@@ -41,15 +44,22 @@ namespace Counter_Emitter
 
             try
             {
-                watcher = new FileSystemWatcher(settingsConfig[DictionaryKey.DBASEDIR])
+                watcher_counter = new FileSystemWatcher(settingsConfig[DictionaryKey.DBASEDIR])
+                {
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Security | NotifyFilters.Size,
+                    Filter = "*.DBF"
+                };
+                watcher_login = new FileSystemWatcher(settingsConfig[DictionaryKey.LOGINDIR])
                 {
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Security | NotifyFilters.Size,
                     Filter = "*.DBF"
                 };
 
-                watcher.Changed += OnChanged;
+                watcher_counter.Changed += OnChanged;
+                watcher_login.Changed += OnChanged;
 
-                watcher.EnableRaisingEvents = true;
+                watcher_counter.EnableRaisingEvents = true;
+                watcher_login.EnableRaisingEvents = true;
                 Console.WriteLine("Listening to file change.. Press CTRL + C to exit..");
 
                 while (!cts.IsCancellationRequested)
@@ -89,7 +99,8 @@ namespace Counter_Emitter
             }
             finally
             {
-                watcher?.Dispose();
+                watcher_counter?.Dispose();
+                watcher_login?.Dispose();
                 workToDo.Close();
                 cts.Dispose();
             }
@@ -173,11 +184,13 @@ namespace Counter_Emitter
             const string DBASEDIR = "DBASEDIR";
             const string USER = "USER";
             const string BRANCHID = "BRANCHID";
+            const string LOGINDIR = "LOGINDIR";
 
             Console.WriteLine("Initializing configs..");
             settingsConfig.Add(DictionaryKey.PLOGIN, ConfigurationManager.AppSettings.Get(PLOGIN) ?? throw new KeyNotFoundException($"Key {PLOGIN} not found"));
             settingsConfig.Add(DictionaryKey.APIURL, ConfigurationManager.AppSettings.Get(APIURL) ?? throw new KeyNotFoundException($"Key {APIURL} not found"));
             settingsConfig.Add(DictionaryKey.DBASEDIR, ConfigurationManager.AppSettings.Get(DBASEDIR) ?? throw new KeyNotFoundException($"Key {DBASEDIR} not found"));
+            settingsConfig.Add(DictionaryKey.LOGINDIR, ConfigurationManager.AppSettings.Get(LOGINDIR) ?? throw new KeyNotFoundException($"Key {LOGINDIR} not found"));
             settingsConfig.Add(DictionaryKey.USER, ConfigurationManager.AppSettings.Get(USER) ?? throw new KeyNotFoundException($"Key {USER} not found"));
             settingsConfig.Add(DictionaryKey.BRANCHID, ConfigurationManager.AppSettings.Get(BRANCHID) ?? throw new KeyNotFoundException($"Key {BRANCHID} not found"));
         }
@@ -241,6 +254,7 @@ namespace Counter_Emitter
             {
                 try
                 {
+                    ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
                     string apikey = GenerateAPIKey($"fungming-{settingsConfig[DictionaryKey.BRANCHID].ToUpper()}-{DateTime.UtcNow:yyyyMMdd}");
                     Uri url = new UriBuilder(urlParam).Uri;
                     client.DefaultRequestHeaders.Accept.Clear();
@@ -291,6 +305,7 @@ namespace Counter_Emitter
         PLOGIN,
         USER,
         APIURL,
+        LOGINDIR,
         DBASEDIR,
         BRANCHID
     }

@@ -87,13 +87,14 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="App.example.config" />
-    <None Include="dbaseFiles\PLOGIN.DBF">
+    <None Include="dbaseFiles\USER.DBF">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="dbaseFiles\PRNSALES.DBF">
+    <None Include="login\PLOGIN.DBF">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
