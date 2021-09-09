@@ -10,14 +10,14 @@ namespace Counter_Emitter
     {
         public UserStrategy(string lUrl, string lFilePath, CancellationToken token) : base (lUrl, lFilePath, token)
         {
-            Url = $"{lUrl}/counteruser";
-            FilePath = lFilePath;
-            cts = token;
+            URL = $"{lUrl}/counteruser";
+            FILE_PATH = lFilePath;
+            Cts = token;
         }
 
-        async public override Task Execute()
+        public override async Task Execute()
         {
-            Records = await GetRecordsFromDbfAsync<UserRecord>(FilePath, cts, null);
+            RECORDS = await GetRecordsFromDbfAsync<UserRecord>(FILE_PATH, Cts, null);
         }
     }
 }

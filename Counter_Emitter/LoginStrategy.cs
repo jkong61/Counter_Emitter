@@ -11,15 +11,15 @@ namespace Counter_Emitter
     {
         public LoginStrategy(string lUrl, string lFilePath, CancellationToken token) : base (lUrl, lFilePath, token)
 {
-            Url = $"{lUrl}/loginsession";
-            FilePath = lFilePath;
-            cts = token;
+            URL = $"{lUrl}/loginsession";
+            FILE_PATH = lFilePath;
+            Cts = token;
         }
 
-        async public override Task Execute()
+        public override async Task Execute()
         {
             DateTime todayDate = DateTime.Today;
-            Records = await GetRecordsFromDbfAsync<LoginRecord>(FilePath, cts, todayDate);
+            RECORDS = await GetRecordsFromDbfAsync<LoginRecord>(FILE_PATH, Cts, todayDate);
         }
     }
 }

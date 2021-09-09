@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{466D8730-9AAE-445B-951C-0B6BED12439E}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>Counter_Emitter</RootNamespace>
     <AssemblyName>Counter_Emitter</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
@@ -32,12 +32,18 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=5.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.5.0.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="NDbfReader, Version=2.3.0.0, Culture=neutral, PublicKeyToken=421d1ecd09787b1d, processorArchitecture=MSIL">
       <HintPath>..\packages\NDbfReader.2.3.0\lib\net45\NDbfReader.dll</HintPath>
+    </Reference>
+    <Reference Include="NDbfReaderEx, Version=1.4.1.1, Culture=neutral, PublicKeyToken=5040535dad69af85, processorArchitecture=MSIL">
+      <HintPath>..\packages\NDbfReaderEx.1.4.1.1\lib\net452\NDbfReaderEx.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -74,13 +80,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LogWriter.cs" />
     <Compile Include="LoginStrategy.cs" />
     <Compile Include="Model\IRecord.cs" />
     <Compile Include="Model\IRecordConverter.cs" />
     <Compile Include="Model\LoginRecord.cs" />
+    <Compile Include="Model\SaleRecord.cs" />
     <Compile Include="Model\UserRecord.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SaleStrategy.cs" />
     <Compile Include="Strategy.cs" />
     <Compile Include="UserStrategy.cs" />
   </ItemGroup>
@@ -90,11 +99,17 @@
     <None Include="dbaseFiles\USER.DBF">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="login\FM310819.POS">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="login\PLOGIN.DBF">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="ReadMe__and__eMeL_ForkInfo.txt" />
+    <Content Include="xbase.txt" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

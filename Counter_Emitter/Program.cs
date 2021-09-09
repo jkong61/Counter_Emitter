@@ -10,9 +10,7 @@ using System.Threading;
 using System.IO;
 using NDbfReader;
 using Counter_Emitter.Model;
-using System.Linq;
 using System.Net;
-using System.Net.Security;
 using System.Text.Json;
 using System.Security.Cryptography;
 
@@ -21,52 +19,61 @@ namespace Counter_Emitter
     class Program
     {
         //private static readonly DateTime todayDate = new DateTime(2019, 8, 31);
-        private static readonly Dictionary<DictionaryKey, string> settingsConfig = new Dictionary<DictionaryKey, string>();
+        private static readonly Dictionary<DictionaryKey, string> SettingsConfig = new Dictionary<DictionaryKey, string>();
 
-        private static readonly CancellationTokenSource cts = new CancellationTokenSource();
-        private static readonly ManualResetEvent workToDo = new ManualResetEvent(false);
+        private static readonly CancellationTokenSource Cts = new CancellationTokenSource();
+        private static readonly ManualResetEvent WorkToDo = new ManualResetEvent(false);
 
-        private static readonly List<string> fileToWatch = new List<string> { "PLOGIN.DBF", "USER.DBF" };
-        private static FileSystemWatcher watcher_counter;
-        private static FileSystemWatcher watcher_login;
-        private static Strategy strategy;
+        private static List<string> FileToWatch;
+        private static FileSystemWatcher _watcherUsers;
+        private static FileSystemWatcher _watcherLogin;
+        private static FileSystemWatcher _watcherDailyCounter;
 
-        async static Task Main(string[] args)
+        private static Strategy _strategy;
+
+        static async Task Main(string[] args)
         {
             InitializeConfiguration();
             Console.CancelKeyPress += (s, evnt) =>
             {
                 Console.WriteLine("Canceling...");
-                cts.Cancel();
-                workToDo.Set();
+                Cts.Cancel();
+                WorkToDo.Set();
                 evnt.Cancel = true;
             };
 
             try
             {
-                watcher_counter = new FileSystemWatcher(settingsConfig[DictionaryKey.DBASEDIR])
+                _watcherUsers = new FileSystemWatcher(SettingsConfig[DictionaryKey.Dbasedir])
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Security | NotifyFilters.Size,
+                    NotifyFilter = NotifyFilters.LastWrite,
                     Filter = "*.DBF"
                 };
-                watcher_login = new FileSystemWatcher(settingsConfig[DictionaryKey.LOGINDIR])
+                _watcherDailyCounter = new FileSystemWatcher(SettingsConfig[DictionaryKey.Logindir])
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Security | NotifyFilters.Size,
+                    NotifyFilter = NotifyFilters.LastWrite,
+                    Filter = "*.pos"
+                };
+                _watcherLogin = new FileSystemWatcher(SettingsConfig[DictionaryKey.Logindir])
+                {
+                    NotifyFilter = NotifyFilters.LastWrite,
                     Filter = "*.DBF"
                 };
 
-                watcher_counter.Changed += OnChanged;
-                watcher_login.Changed += OnChanged;
+                _watcherUsers.Changed += OnChanged;
+                _watcherDailyCounter.Changed += OnChanged;
+                _watcherLogin.Changed += OnChanged;
 
-                watcher_counter.EnableRaisingEvents = true;
-                watcher_login.EnableRaisingEvents = true;
+                _watcherUsers.EnableRaisingEvents = true;
+                _watcherDailyCounter.EnableRaisingEvents = true;
+                _watcherLogin.EnableRaisingEvents = true;
                 Console.WriteLine("Listening to file change.. Press CTRL + C to exit..");
 
-                while (!cts.IsCancellationRequested)
+                while (!Cts.IsCancellationRequested)
                 {
-                    if (workToDo.WaitOne())
+                    if (WorkToDo.WaitOne())
                     {
-                        workToDo.Reset();
+                        WorkToDo.Reset();
                         Console.WriteLine("File Change Detected.");
                     }
                     else
@@ -76,12 +83,13 @@ namespace Counter_Emitter
 
                     try
                     {
-                        if (!cts.IsCancellationRequested) await MainAsync();
+                        if (!Cts.IsCancellationRequested) await MainAsync();
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine("\nException Caught!");
                         Console.WriteLine($"Message : {ex.Message}");
+                        LogWriterCounter.LogWrite($"{ex.Message} : {ex.StackTrace}");
                         //Console.WriteLine("Press any key to continue...");
                     }
                     finally
@@ -99,10 +107,11 @@ namespace Counter_Emitter
             }
             finally
             {
-                watcher_counter?.Dispose();
-                watcher_login?.Dispose();
-                workToDo.Close();
-                cts.Dispose();
+                _watcherUsers?.Dispose();
+                _watcherDailyCounter?.Dispose();
+                _watcherLogin?.Dispose();
+                WorkToDo.Close();
+                Cts.Dispose();
             }
         }
 
@@ -110,25 +119,30 @@ namespace Counter_Emitter
         {
             // get the file's extension
             string fileName = e.Name;
-            string baseUrl = settingsConfig[DictionaryKey.APIURL];
+            string baseUrl = SettingsConfig[DictionaryKey.Apiurl];
 
             // filter file types
-            if (fileToWatch.Contains(fileName))
+            if (FileToWatch.Contains(fileName))
             {
-                switch (fileName)
+                if (fileName == FileToWatch[0])
                 {
-                    case "PLOGIN.DBF":
-                        strategy = new LoginStrategy(baseUrl, settingsConfig[DictionaryKey.PLOGIN], cts.Token);
-                        break;
-                    case "USER.DBF":
-                        strategy = new UserStrategy(baseUrl, settingsConfig[DictionaryKey.USER], cts.Token);
-                        break;
-                    default:
-                        strategy = null;
-                        return;
+                    _strategy = new LoginStrategy(baseUrl, SettingsConfig[DictionaryKey.Plogin], Cts.Token);
+                }
+                else if (fileName == FileToWatch[1])
+                {
+                    _strategy = new UserStrategy(baseUrl, SettingsConfig[DictionaryKey.User], Cts.Token);
+                }
+                else if (fileName == FileToWatch[2])
+                {
+                    _strategy = new SaleStrategy(baseUrl, $"{SettingsConfig[DictionaryKey.Logindir]}/{FileToWatch[2]}", Cts.Token);
+                }
+                else
+                {
+                    _strategy = null;
+                    return;
                 }
                 Console.WriteLine($"A change has been made to a watched file type. {fileName}");
-                workToDo.Set();
+                WorkToDo.Set();
             }
         }
 
@@ -137,21 +151,21 @@ namespace Counter_Emitter
 
             try
             {
-                await strategy.Execute();
+                await _strategy.Execute();
 
-                if (strategy.Records.Count > 0)
+                if (_strategy.RECORDS.Count > 0)
                 {
 
                     var jsonOptions = new JsonSerializerOptions
                     {
-                        Converters = { new IRecordConverter() },
+                        Converters = { new RecordConverter() },
                         IncludeFields = true
                     };
 
                     Dictionary<string, string> jsonObj = new Dictionary<string, string>
                     {
-                        { "data", JsonSerializer.Serialize(strategy.Records, jsonOptions) },
-                        { "branch", settingsConfig[DictionaryKey.BRANCHID] }
+                        { "data", JsonSerializer.Serialize(_strategy.RECORDS, jsonOptions) },
+                        { "branch", SettingsConfig[DictionaryKey.Branchid] }
                     };
 
                     //var serializedJsonObj = JsonSerializer.SerializeToUtf8Bytes(jsonObj);
@@ -160,11 +174,11 @@ namespace Counter_Emitter
                     using (var content = new StringContent(stringJsonObj, Encoding.UTF8, "application/json"))
                     {
                         // Send the datajsonObj to api
-                        await SendPostRequestAsync(strategy.Url, content, strategy.cts);
+                        await SendPostRequestAsync(_strategy.URL, content, _strategy.Cts);
                     }
                     // Reset the setting key
-                    strategy.Clear();
-                    strategy = null;
+                    _strategy.Clear();
+                    _strategy = null;
                 }
                 else
                 {
@@ -179,20 +193,26 @@ namespace Counter_Emitter
 
         private static void InitializeConfiguration()
         {
-            const string PLOGIN = "PLOGINPATH";
-            const string APIURL = "APIURL";
-            const string DBASEDIR = "DBASEDIR";
-            const string USER = "USER";
-            const string BRANCHID = "BRANCHID";
-            const string LOGINDIR = "LOGINDIR";
+            const string plogin = "PLOGINPATH";
+            const string apiurl = "APIURL";
+            const string dbasedir = "DBASEDIR";
+            const string user = "USER";
+            const string branchid = "BRANCHID";
+            const string logindir = "LOGINDIR";
 
             Console.WriteLine("Initializing configs..");
-            settingsConfig.Add(DictionaryKey.PLOGIN, ConfigurationManager.AppSettings.Get(PLOGIN) ?? throw new KeyNotFoundException($"Key {PLOGIN} not found"));
-            settingsConfig.Add(DictionaryKey.APIURL, ConfigurationManager.AppSettings.Get(APIURL) ?? throw new KeyNotFoundException($"Key {APIURL} not found"));
-            settingsConfig.Add(DictionaryKey.DBASEDIR, ConfigurationManager.AppSettings.Get(DBASEDIR) ?? throw new KeyNotFoundException($"Key {DBASEDIR} not found"));
-            settingsConfig.Add(DictionaryKey.LOGINDIR, ConfigurationManager.AppSettings.Get(LOGINDIR) ?? throw new KeyNotFoundException($"Key {LOGINDIR} not found"));
-            settingsConfig.Add(DictionaryKey.USER, ConfigurationManager.AppSettings.Get(USER) ?? throw new KeyNotFoundException($"Key {USER} not found"));
-            settingsConfig.Add(DictionaryKey.BRANCHID, ConfigurationManager.AppSettings.Get(BRANCHID) ?? throw new KeyNotFoundException($"Key {BRANCHID} not found"));
+            SettingsConfig.Add(DictionaryKey.Plogin, ConfigurationManager.AppSettings.Get(plogin) ?? throw new KeyNotFoundException($"Key {plogin} not found"));
+            SettingsConfig.Add(DictionaryKey.Apiurl, ConfigurationManager.AppSettings.Get(apiurl) ?? throw new KeyNotFoundException($"Key {apiurl} not found"));
+            SettingsConfig.Add(DictionaryKey.Dbasedir, ConfigurationManager.AppSettings.Get(dbasedir) ?? throw new KeyNotFoundException($"Key {dbasedir} not found"));
+            SettingsConfig.Add(DictionaryKey.Logindir, ConfigurationManager.AppSettings.Get(logindir) ?? throw new KeyNotFoundException($"Key {logindir} not found"));
+            SettingsConfig.Add(DictionaryKey.User, ConfigurationManager.AppSettings.Get(user) ?? throw new KeyNotFoundException($"Key {user} not found"));
+            SettingsConfig.Add(DictionaryKey.Branchid, ConfigurationManager.AppSettings.Get(branchid) ?? throw new KeyNotFoundException($"Key {branchid} not found"));
+
+            FileToWatch = new List<string> {
+                "PLOGIN.DBF",
+                "USER.DBF",
+                $"{SettingsConfig[DictionaryKey.Branchid]}{DateTime.Now:ddMMyy}.pos"
+            };
         }
 
         /// <summary>
@@ -203,7 +223,7 @@ namespace Counter_Emitter
         /// <param name="fileRoute">Path to The DBF file</param>
         /// <param name="cts"></param>
         /// <returns>An IList of Type <typeparamref name="T"/></returns>
-        public async static Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts, DateTime? dateTimeFilter) where T : IRecord, new()
+        public static async Task<IList<IRecord>> GetRecordsFromDbfAsync<T>(string fileRoute, CancellationToken cts, DateTime? dateTimeFilter) where T : IRecord, new()
         {
             Console.WriteLine($"Reading DBF from ..{fileRoute}");
             var records = new List<IRecord>();
@@ -216,22 +236,22 @@ namespace Counter_Emitter
                         var reader = table.OpenReader(Encoding.UTF8);
                         while (await reader.ReadAsync(cts))
                         {
-                            T TRecord = new T();
+                            T record = new T();
                             PropertyInfo[] properties = typeof(T).GetProperties();
                             for (int i = 0; i < table.Columns.Count; i++)
                             {
-                                properties[i].SetValue(TRecord, reader.GetValue(table.Columns[i]));
+                                properties[i].SetValue(record, reader.GetValue(table.Columns[i]));
                             }
 
                             if (dateTimeFilter is null)
                             {
-                                records.Add(TRecord);
+                                records.Add(record);
                                 continue;
                             }
 
-                            if (TRecord.DATE == dateTimeFilter)
+                            if (record.DATE == dateTimeFilter)
                             {
-                                records.Add(TRecord);
+                                records.Add(record);
                             }
                         }
                     }
@@ -248,18 +268,21 @@ namespace Counter_Emitter
             return records;
         }
 
-        private async static Task SendPostRequestAsync(string urlParam, HttpContent content, CancellationToken cts)
+        private static async Task SendPostRequestAsync(string urlParam, HttpContent content, CancellationToken cts)
         {
             using (HttpClient client = new HttpClient())
             {
                 try
                 {
                     ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-                    string apikey = GenerateAPIKey($"fungming-{settingsConfig[DictionaryKey.BRANCHID].ToUpper()}-{DateTime.UtcNow:yyyyMMdd}");
+                    string apikey =
+                        GenerateApiKey(
+                            $"fungming-{SettingsConfig[DictionaryKey.Branchid].ToUpper()}-{DateTime.UtcNow:yyyyMMdd}");
                     Uri url = new UriBuilder(urlParam).Uri;
                     client.DefaultRequestHeaders.Accept.Clear();
                     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                    if (apikey != null) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apikey);
+                    if (apikey != null)
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apikey);
 
                     Console.WriteLine($"Sending Request to ..{url}..");
                     HttpResponseMessage response = await client.PostAsync(url, content, cts);
@@ -270,18 +293,18 @@ namespace Counter_Emitter
                     Console.WriteLine($"Response was {httpStatus}");
                     //Console.WriteLine("Request Complete. Exiting..!");
                     Console.WriteLine("Request Complete.");
+
+                    LogWriterCounter.LogWrite($"Response to {url} was {httpStatus}");
+                    response.Dispose();
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine("\nException Caught!");
-                    Console.WriteLine($"Message : {ex.Message}");
-                    //Console.WriteLine("Press any key to continue...");
+                    throw new Exception($"Error occured when sending to {urlParam}");
                 }
             }
-
         }
 
-        private static string GenerateAPIKey(string rawData)
+        private static string GenerateApiKey(string rawData)
         {
             // Create a SHA256   
             using (SHA256 sha256Hash = SHA256.Create())
@@ -302,12 +325,12 @@ namespace Counter_Emitter
 
     enum DictionaryKey
     {
-        PLOGIN,
-        USER,
-        APIURL,
-        LOGINDIR,
-        DBASEDIR,
-        BRANCHID
+        Plogin,
+        User,
+        Apiurl,
+        Logindir,
+        Dbasedir,
+        Branchid
     }
 }
 

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Counter_Emitter.Model
 {
-    class IRecordConverter : JsonConverter<IRecord>
+    class RecordConverter : JsonConverter<IRecord>
     {
         public override IRecord Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

@@ -8,23 +8,23 @@ namespace Counter_Emitter
 {
     abstract class Strategy
     {
-        public CancellationToken cts;
-        public string Url { get; set; }
-        public string FilePath { get; set; }
-        public IList<IRecord> Records { get; set; }
+        public CancellationToken Cts;
+        public string URL { get; set; }
+        public string FILE_PATH { get; set; }
+        public IList<IRecord> RECORDS { get; set; }
 
         protected Strategy(string lUrl, string lFilePath, CancellationToken lToken)
         {
-            Url = lUrl;
-            FilePath = lFilePath;
-            cts = lToken;
-            Records = new List<IRecord>();
+            URL = lUrl;
+            FILE_PATH = lFilePath;
+            Cts = lToken;
+            RECORDS = new List<IRecord>();
         }
 
         public abstract Task Execute();
         public virtual void Clear()
         {
-            Records.Clear();
+            RECORDS.Clear();
         }
     }
 }
